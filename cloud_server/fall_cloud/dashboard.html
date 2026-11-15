@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>老人跌倒监测 · 云端监控</title>
+<style>
+:root{
+  --bg:#f3f5f8; --card:#ffffff; --text:#1f2430; --sub:#7a8294; --line:#e3e7ee;
+  --ok:#19a15f; --okbg:#e8f7ed; --bad:#e5484d; --badbg:#fde8e8; --warn:#d98500; --warnbg:#fff4df;
+  --off:#9aa1b0; --offbg:#eceff4; --accent:#2f7de1; --pitch:#2f7de1; --roll:#e8833a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14171d; --card:#1d2129; --text:#e8ebf2; --sub:#8e97aa; --line:#2c323d;
+    --okbg:#173326; --badbg:#3a1d20; --warnbg:#3a2d12; --offbg:#262b35;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:20px;margin:0}
+.sub{color:var(--sub);font-size:12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--off);margin-right:6px}
+.dot.on{background:var(--ok)} .dot.err{background:var(--bad)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
+.card{background:var(--card);border-radius:14px;padding:16px;border:1px solid var(--line)}
+.c12{grid-column:span 12}.c8{grid-column:span 8}.c6{grid-column:span 6}.c4{grid-column:span 4}
+@media(max-width:820px){.c8,.c6,.c4{grid-column:span 12}}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600}
+
+/* 状态大卡片 */
+.state{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.state .big{font-size:28px;font-weight:700}
+.state.ok{background:var(--okbg);border-color:transparent} .state.ok .big{color:var(--ok)}
+.state.bad{background:var(--badbg);border-color:transparent;animation:pulse 1.2s infinite} .state.bad .big{color:var(--bad)}
+.state.off{background:var(--offbg);border-color:transparent} .state.off .big{color:var(--off)}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(229,72,77,.18)}}
+.state .meta{margin-left:auto;text-align:right;color:var(--sub);font-size:12px}
+
+/* 角度 */
+.angle{margin-bottom:14px}
+.angle .row{display:flex;align-items:baseline;justify-content:space-between}
+.angle .val{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums}
+.angle .name{color:var(--sub)}
+.bar{position:relative;height:8px;border-radius:4px;background:var(--offbg);margin-top:6px}
+.bar::after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:14px;background:var(--line)}
+.bar i{position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;margin-left:-7px;left:50%;transition:left .4s}
+.bar.p i{background:var(--pitch)} .bar.r i{background:var(--roll)}
+.scale{display:flex;justify-content:space-between;color:var(--sub);font-size:11px;margin-top:6px}
+canvas{width:100%;height:200px;display:block}
+.legend{display:flex;gap:16px;color:var(--sub);font-size:12px;margin-top:6px}
+.legend b{display:inline-block;width:10px;height:3px;vertical-align:middle;margin-right:4px}
+
+/* 链路 */
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{flex:1;min-width:90px;padding:10px 12px;border-radius:10px;background:var(--offbg);color:var(--off)}
+.chip b{display:block;font-size:12px;color:var(--sub);font-weight:500}
+.chip span{font-weight:700}
+.chip.on{background:var(--okbg);color:var(--ok)}
+.chip.warn{background:var(--warnbg);color:var(--warn)}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border:0}.kv span:first-child{color:var(--sub)}
+
+/* 按钮 */
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+button{font:inherit;border:0;border-radius:9px;padding:9px 14px;cursor:pointer;background:var(--accent);color:#fff}
+button.gray{background:var(--offbg);color:var(--text)}
+button.red{background:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+.msg{margin-top:10px;color:var(--sub);font-size:12px;min-height:18px}
+
+/* 表格 */
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{color:var(--sub);font-weight:500;font-size:12px}
+.tag{padding:2px 8px;border-radius:10px;font-size:12px}
+.tag.y{background:var(--badbg);color:var(--bad)} .tag.n{background:var(--okbg);color:var(--ok)}
+a{color:var(--accent);text-decoration:none}
+
+/* 报警横幅 */
+#banner{display:none;margin-bottom:14px;padding:14px 16px;border-radius:12px;background:var(--bad);color:#fff;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>老人跌倒监测 · 云端监控</h1>
+    <div class="sub">设备 <span id="devId">ESP32_001</span> · 每 2 秒自动刷新</div>
+  </div>
+  <div>
+    <span class="sub"><span class="dot" id="srvDot"></span><span id="srvText">连接服务器中…</span></span>
+    <button class="gray" id="soundBtn" style="margin-left:10px">🔇 开启声音提醒</button>
+  </div>
+</header>
+
+<div id="banner"></div>
+
+<div class="grid">
+
+  <!-- 当前状态 -->
+  <div class="card c12 state off" id="stateCard">
+    <div class="big" id="stateText">等待数据…</div>
+    <div class="meta">
+      <div>最后更新：<span id="updTime">—</span></div>
+      <div>监测：<span id="monText">—</span></div>
+    </div>
+  </div>
+
+  <!-- 角度 + 曲线 -->
+  <div class="card c8">
+    <h2>倾斜角度（实时）</h2>
+    <div class="angle">
+      <div class="row"><span class="name">Pitch 俯仰角</span><span class="val" id="pitchVal">—</span></div>
+      <div class="bar p"><i id="pitchDot"></i></div>
+    </div>
+    <div class="angle">
+      <div class="row"><span class="name">Roll 横滚角</span><span class="val" id="rollVal">—</span></div>
+      <div class="bar r"><i id="rollDot"></i></div>
+    </div>
+    <div class="scale"><span>-180°</span><span>0°</span><span>180°</span></div>
+    <canvas id="chart" style="margin-top:14px"></canvas>
+    <div class="legend"><span><b style="background:var(--pitch)"></b>Pitch</span><span><b style="background:var(--roll)"></b>Roll</span><span>最近约 3 分钟</span></div>
+  </div>
+
+  <!-- 链路 + 控制 -->
+  <div class="card c4">
+    <h2>通信链路</h2>
+    <div class="chips">
+      <div class="chip" id="chipWifi"><b>WiFi</b><span>—</span></div>
+      <div class="chip" id="chipBle"><b>蓝牙</b><span>—</span></div>
+      <div class="chip" id="chipG4"><b>4G</b><span>—</span></div>
+    </div>
+    <div style="margin-top:10px" class="kv"><span>当前通信方式</span><span id="route">—</span></div>
+
+    <h2 style="margin-top:18px">云端控制</h2>
+    <div class="btns">
+      <button data-cmd="start_monitoring">开启监测</button>
+      <button class="gray" data-cmd="stop_monitoring">关闭监测</button>
+      <button class="red" data-cmd="emergency">紧急呼叫</button>
+    </div>
+    <div class="msg" id="cmdMsg"></div>
+  </div>
+
+  <!-- 最新报警 + 手机定位 -->
+  <div class="card c6">
+    <h2>最新报警</h2>
+    <div class="kv"><span>状态</span><span id="alFallen">—</span></div>
+    <div class="kv"><span>时间</span><span id="alTime">—</span></div>
+    <div class="kv"><span>来源</span><span id="alSrc">—</span></div>
+    <div class="kv"><span>位置</span><span id="alPos">—</span></div>
+    <div class="btns"><button class="gray" id="clearBtn">标记已处理（清除报警）</button></div>
+  </div>
+
+  <div class="card c6">
+    <h2>老人手机定位</h2>
+    <div class="kv"><span>手机在线</span><span id="phOnline">—</span></div>
+    <div class="kv"><span>位置</span><span id="phPos">—</span></div>
+    <div class="kv"><span>精度</span><span id="phAcc">—</span></div>
+    <div class="kv"><span>上报时间</span><span id="phTime">—</span></div>
+  </div>
+
+  <!-- 历史 -->
+  <div class="card c12">
+    <h2>报警历史（最近 20 条）</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>时间</th><th>跌倒</th><th>Pitch</th><th>Roll</th><th>通信来源</th><th>位置</th></tr></thead>
+        <tbody id="hist"><tr><td colspan="6" class="sub">暂无记录</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const DEVICE = 'ESP32_001';
+const POLL_MS = 2000;
+const ONLINE_WINDOW_MS = 10000;   // 超过这个时间没有新数据，判定设备离线
+const MAX_POINTS = 90;
+
+const $ = (id) => document.getElementById(id);
+const series = { pitch: [], roll: [] };
+let lastStatusTime = null;        // 上次看到的设备状态时间（服务器时间字符串）
+let lastChangedAt = 0;            // 浏览器收到“状态时间变化”的时刻
+let lastAlarmSig = null;
+let soundOn = false;
+let audioCtx = null;
+
+/* ---------- 工具 ---------- */
+function fmt(n, d = 1) { return (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toFixed(d); }
+function setChip(el, state, text) {
+  el.className = 'chip ' + state;
+  el.querySelector('span').textContent = text;
+}
+async function getJSON(url) {
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + '_ts=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function amapLink(lat, lng) {
+  return 'https://uri.amap.com/marker?position=' + lng + ',' + lat + '&coordinate=wgs84';
+}
+function posHtml(lat, lng) {
+  if (lat === null || lat === undefined || lng === null || lng === undefined || lat === '' || lng === '') return '—';
+  return Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + ' <a target="_blank" href="' + amapLink(lat, lng) + '">地图</a>';
+}
+function srcText(s) {
+  return { '4g': '4G / GNSS', wifi: 'WiFi', bluetooth: '蓝牙', phone: '手机' }[s] || (s || '—');
+}
+
+/* ---------- 声音提醒 ---------- */
+$('soundBtn').onclick = () => {
+  soundOn = !soundOn;
+  if (soundOn && !audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  $('soundBtn').textContent = soundOn ? '🔔 声音提醒已开启' : '🔇 开启声音提醒';
+  if (soundOn) beep();
+};
+function beep() {
+  if (!soundOn || !audioCtx) return;
+  [0, 0.35, 0.7].forEach((t) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = 880;
+    g.gain.value = 0.15;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.2);
+  });
+}
+
+/* ---------- 曲线 ---------- */
+function drawChart() {
+  const cv = $('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  const line = css.getPropertyValue('--line').trim(), sub = css.getPropertyValue('--sub').trim();
+  const yOf = (v) => h - ((v + 180) / 360) * h;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = '10px sans-serif'; ctx.fillStyle = sub; ctx.strokeStyle = line; ctx.lineWidth = 1;
+  [-180, -90, 0, 90, 180].forEach((v) => {
+    const y = Math.min(h - 0.5, Math.max(0.5, yOf(v)));
+    ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.fillText(v + '°', 0, Math.min(h - 2, Math.max(10, y + 3)));
+  });
+
+  const plot = (arr, color) => {
+    if (arr.length < 2) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    arr.forEach((v, i) => {
+      const x = 28 + (i / (MAX_POINTS - 1)) * (w - 28);
+      i ? ctx.lineTo(x, yOf(v)) : ctx.moveTo(x, yOf(v));
+    });
+    ctx.stroke();
+  };
+  plot(series.pitch, css.getPropertyValue('--pitch').trim());
+  plot(series.roll, css.getPropertyValue('--roll').trim());
+}
+
+/* ---------- 刷新设备状态 ---------- */
+function renderStatus(s) {
+  const now = Date.now();
+
+  // 用“状态时间是否变化”判断设备是否仍在上传，避免服务器与浏览器时区不一致
+  if (s.time && s.time !== lastStatusTime) { lastStatusTime = s.time; lastChangedAt = now; }
+  let online = lastChangedAt > 0 && now - lastChangedAt < ONLINE_WINDOW_MS;
+  if (!online && s.time) {   // 首次打开页面时的兜底判断
+    const age = now - Date.parse(String(s.time).replace(' ', 'T'));
+    if (age > -5000 && age < ONLINE_WINDOW_MS) online = true;
+  }
+
+  const card = $('stateCard');
+  if (!s.time) {
+    card.className = 'card c12 state off'; $('stateText').textContent = '设备尚未上传数据';
+  } else if (!online) {
+    card.className = 'card c12 state off'; $('stateText').textContent = '⚪ 设备离线';
+  } else if (s.fallen) {
+    card.className = 'card c12 state bad'; $('stateText').textContent = '⚠️ 检测到老人跌倒';
+  } else {
+    card.className = 'card c12 state ok'; $('stateText').textContent = '✓ 当前状态正常';
+  }
+  $('updTime').textContent = s.time || '—';
+  $('monText').textContent = s.monitoring_active === true ? '监测中' : (s.monitoring_active === false ? '已停止' : '—');
+
+  // 角度
+  const pitch = s.pitch, roll = s.roll;
+  $('pitchVal').textContent = pitch == null ? '—' : fmt(pitch) + '°';
+  $('rollVal').textContent = roll == null ? '—' : fmt(roll) + '°';
+  const pos = (v) => Math.max(0, Math.min(100, ((v + 180) / 360) * 100)) + '%';
+  if (pitch != null) $('pitchDot').style.left = pos(pitch);
+  if (roll != null) $('rollDot').style.left = pos(roll);
+  if (online && pitch != null && roll != null && s.time === lastStatusTime && lastChangedAt === now) {
+    series.pitch.push(Number(pitch)); series.roll.push(Number(roll));
+    if (series.pitch.length > MAX_POINTS) { series.pitch.shift(); series.roll.shift(); }
+  }
+  drawChart();
+
+  // 链路
+  const wifi = s.wifi_connected, ble = s.bluetooth_connected, g4 = s.four_g_active;
+  setChip($('chipWifi'), online && wifi ? 'on' : '', online && wifi ? '已连接' : '未连接');
+  setChip($('chipBle'), online && ble ? 'on' : '', online && ble ? '已连接' : '未连接');
+  let g4Text = '待机', g4State = '';
+  if (g4) { g4Text = '应急已触发'; g4State = 'on'; }
+  else if (s.waiting_for_4g) { g4Text = '等待 ' + (s['4g_countdown'] || 0) + 's'; g4State = 'warn'; }
+  setChip($('chipG4'), g4State, g4Text);
+
+  let route = '暂无可用链路';
+  if (online && wifi) route = 'WiFi → 云端';
+  else if (online && ble) route = '蓝牙 → 手机 → 云端';
+  else if (g4) route = '4G → 云端（应急）';
+  else if (s.waiting_for_4g) route = '等待 15 秒 → 4G';
+  $('route').textContent = route;
+}
+
+/* ---------- 报警 ---------- */
+function renderAlarm(a, first) {
+  $('alFallen').innerHTML = a.fallen ? '<span class="tag y">跌倒</span>' : '<span class="tag n">无报警</span>';
+  $('alTime').textContent = a.time || '—';
+  $('alSrc').textContent = srcText(a.location_source);
+  $('alPos').innerHTML = posHtml(a.latitude, a.longitude);
+
+  const sig = [a.time, a.fallen, a.location_source, a.latitude, a.longitude].join('|');
+  const changed = lastAlarmSig !== null && sig !== lastAlarmSig;
+  lastAlarmSig = sig;
+  if (changed && a.fallen) {
+    const b = $('banner');
+    b.style.display = 'block';
+    b.textContent = '🚨 收到新的跌倒报警：' + (a.time || '') + '（' + srcText(a.location_source) + '）';
+    beep();
+  }
+  if (!a.fallen) $('banner').style.display = 'none';
+}
+
+function renderHistory(list) {
+  const rows = (list || []).slice(0, 20).map((a) =>
+    '<tr><td>' + (a.time || '—') + '</td>' +
+    '<td>' + (a.fallen ? '<span class="tag y">跌倒</span>' : '<span class="tag n">正常</span>') + '</td>' +
+    '<td>' + fmt(a.pitch) + '°</td><td>' + fmt(a.roll) + '°</td>' +
+    '<td>' + srcText(a.location_source) + '</td>' +
+    '<td>' + posHtml(a.latitude, a.longitude) + '</td></tr>');
+  $('hist').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" class="sub">暂无记录</td></tr>';
+}
+
+function renderPhone(p) {
+  $('phOnline').innerHTML = p.phone_online ? '<span class="tag n">在线</span>' : '<span class="tag y" style="background:var(--offbg);color:var(--off)">离线</span>';
+  $('phPos').innerHTML = posHtml(p.latitude, p.longitude);
+  $('phAcc').textContent = p.accuracy == null ? '—' : fmt(p.accuracy, 0) + ' m';
+  $('phTime').textContent = p.time || '—';
+}
+
+/* ---------- 轮询 ---------- */
+async function poll() {
+  try {
+    const q = '?device_id=' + encodeURIComponent(DEVICE);
+    const [st, al, hi, ph] = await Promise.all([
+      getJSON('/api/device/status' + q),
+      getJSON('/api/alarm/latest'),
+      getJSON('/api/alarm/history' + q),
+      getJSON('/api/location' + q)
+    ]);
+    $('srvDot').className = 'dot on'; $('srvText').textContent = '服务器正常';
+    if (st.success) renderStatus(st.data);
+    if (al.success) renderAlarm(al.data);
+    if (hi.success) renderHistory(hi.data);
+    if (ph.success) renderPhone(ph.data);
+  } catch (e) {
+    $('srvDot').className = 'dot err'; $('srvText').textContent = '无法连接服务器';
+  }
+}
+
+/* ---------- 控制 ---------- */
+document.querySelectorAll('[data-cmd]').forEach((btn) => {
+  btn.onclick = async () => {
+    const cmd = btn.dataset.cmd;
+    if (cmd === 'emergency' && !confirm('确定要发送紧急呼叫吗？')) return;
+    $('cmdMsg').textContent = '发送中…';
+    try {
+      const r = await fetch('/api/command', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: DEVICE, command: cmd })
+      });
+      const j = await r.json();
+      $('cmdMsg').textContent = j.success ? '✓ 命令已发送，等待设备取走执行' : '✗ ' + (j.message || '发送失败');
+    } catch (e) { $('cmdMsg').textContent = '✗ 无法连接服务器'; }
+  };
+});
+
+$('clearBtn').onclick = async () => {
+  if (!confirm('确认已处理该报警并清除最新报警状态？（历史记录保留）')) return;
+  try {
+    await fetch('/api/alarm/clear', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: DEVICE })
+    });
+    lastAlarmSig = null; poll();
+  } catch (e) {}
+};
+
+window.addEventListener('resize', drawChart);
+poll(); setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>

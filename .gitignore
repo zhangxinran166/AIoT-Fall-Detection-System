@@ -1,0 +1,16 @@
+﻿# Build/runtime files that should not be committed
+.pio/
+.vscode/
+__pycache__/
+*.pyc
+*.log
+*.bak
+
+# Runtime data / secrets
+cloud_server/fall_cloud/fall.db
+cloud_server/fall_cloud/.env
+cloud_server/fall_cloud/admin_password.txt
+
+# uni-app build output
+FALLAPP/unpackage/
+.hbuilderx/

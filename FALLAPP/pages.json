@@ -1,0 +1,119 @@
+{
+	"pages": [
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录"
+			}
+		},
+		{
+			"path": "pages/login/forgot",
+			"style": {
+				"navigationBarTitleText": "找回密码"
+			}
+		},
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "老人跌倒预警系统",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "dark"
+			}
+		},
+		{
+			"path": "pages/index/profile",
+			"style": {
+				"navigationBarTitleText": "个人中心"
+			}
+		},
+		{
+			"path": "pages/family/index",
+			"style": {
+				"navigationBarTitleText": "家人端首页",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "dark"
+			}
+		},
+		{
+			"path": "pages/family/ai",
+			"style": {
+				"navigationBarTitleText": "AI 助手"
+			}
+		},
+		{
+			"path": "pages/message/message",
+			"style": {
+				"navigationBarTitleText": "告警消息"
+			}
+		},
+		{
+			"path": "pages/family/user",
+			"style": {
+				"navigationBarTitleText": "个人中心"
+			}
+		},
+		{
+			"path": "pages/familyLocation/familyLocation",
+			"style": {
+				"navigationBarTitleText": "老人位置"
+			}
+		},
+		{
+			"path": "pages/family/elders",
+			"style": {
+				"navigationBarTitleText": "我的老人"
+			}
+		},
+		{
+			"path": "pages/family/alarmList",
+			"style": {
+				"navigationBarTitleText": "告警记录"
+			}
+		},
+		{
+			"path": "pages/family/alarmHourDetail",
+			"style": {
+				"navigationBarTitleText": "跌倒记录详情"
+			}
+		},
+		{
+			"path": "pages/family/offlinePeriods",
+			"style": {
+				"navigationBarTitleText": "离线时间段"
+			}
+		},
+		{
+			"path": "pages/family/helpList",
+			"style": {
+				"navigationBarTitleText": "老人主动求助警报"
+			}
+		},
+		{
+			"path": "pages/family/helpDetail",
+			"style": {
+				"navigationBarTitleText": "求助详情"
+			}
+		},
+		{
+			"path": "pages/family/sedentaryList",
+			"style": {
+				"navigationBarTitleText": "久坐记录"
+			}
+		},
+		{
+			"path": "pages/remind/remind",
+			"style": {
+				"navigationBarTitleText": "家人提醒消息"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "uni-app",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"uniIdRouter": {}
+}

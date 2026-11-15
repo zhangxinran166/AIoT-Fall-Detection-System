@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跌倒监测 · 管理后台</title>
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--text:#1f2430;--sub:#7a8294;--line:#e3e7ee;--ok:#19a15f;--bad:#e5484d;--warn:#d98500;--off:#9aa1b0}
+@media(prefers-color-scheme:dark){:root{--bg:#14171d;--card:#1d2129;--text:#e8ebf2;--sub:#8e97aa;--line:#2c323d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.w{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+h1{font-size:20px;margin:0}h2{font-size:14px;color:var(--sub);margin:0 0 10px}
+.sub{color:var(--sub);font-size:12px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.t{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--sub);font-weight:500;font-size:12px}
+.tag{padding:2px 9px;border-radius:10px;font-size:12px;color:#fff}
+.normal,.online,.acked{background:var(--ok)}.fallen,.lost{background:var(--bad)}
+.offline,.never{background:var(--off)}.pending,.delivered{background:var(--warn)}
+.empty{color:var(--sub);padding:8px 0}
+button{font:inherit;border:0;border-radius:8px;padding:6px 12px;background:var(--line);color:var(--text);cursor:pointer}
+#msg{color:var(--bad);margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="w">
+<header>
+  <div><h1>跌倒监测 · 管理后台</h1><div class="sub">每 5 秒自动刷新 · 服务器时间 <span id="st">—</span></div></div>
+  <button id="pw">更换管理员密码</button>
+</header>
+<div id="msg"></div>
+<section><h2>设备状态</h2><div class="t"><table id="dev"></table></div></section>
+<section><h2>用户与 APP 状态</h2><div class="t"><table id="usr"></table></div></section>
+<section><h2>家属通知记录</h2><div class="t"><table id="nts"></table></div></section>
+<section><h2>APP 错误与闪退（最近 30 条）</h2><div class="t"><table id="err"></table></div></section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const NAMES = {normal:'正常', fallen:'跌倒', offline:'离线', never:'从未上线', online:'在线', lost:'已退出/可能崩溃',
+  pending:'已生成', delivered:'已送达', acked:'已确认'};
+const tag = (s) => '<span class="tag ' + esc(s) + '">' + esc(NAMES[s] || s) + '</span>';
+const KIND = {js_error:'代码错误', last_run_crash:'上次闪退', other:'其他'};
+
+function table(el, head, rows) {
+  el.innerHTML = '<tr>' + head.map((h) => '<th>' + h + '</th>').join('') + '</tr>' +
+    (rows.length ? rows.join('') : '<tr><td class="empty" colspan="' + head.length + '">暂无数据</td></tr>');
+}
+const tr = (cells) => '<tr>' + cells.map((c) => '<td>' + c + '</td>').join('') + '</tr>';
+
+function password() {
+  let p = sessionStorage.getItem('adminPw');
+  if (!p) { p = prompt('请输入管理员密码'); if (p) sessionStorage.setItem('adminPw', p); }
+  return p || '';
+}
+$('pw').onclick = () => { sessionStorage.removeItem('adminPw'); load(); };
+
+async function load() {
+  try {
+    const r = await fetch('/api/admin/overview?_=' + Date.now(), { headers: { 'X-Admin-Password': password() }, cache: 'no-store' });
+    const j = await r.json();
+    if (r.status === 401) { sessionStorage.removeItem('adminPw'); $('msg').textContent = '管理员密码错误，请重新输入'; return; }
+    if (!j.success) { $('msg').textContent = j.message || '加载失败'; return; }
+    $('msg').textContent = '';
+    $('st').textContent = j.server_time;
+
+    table($('dev'), ['设备', '状态', '当前链路', 'Pitch', 'Roll', '最后上传', '最近报警', '老人/家属', '未确认通知'],
+      j.devices.map((d) => tr([esc(d.device_id), tag(d.status) + (d.waiting_for_4g ? ' 等待4G' : ''), esc(d.link),
+        d.pitch == null ? '—' : esc(d.pitch) + '°', d.roll == null ? '—' : esc(d.roll) + '°',
+        esc(d.last_upload || '—'), esc(d.last_alarm_time || '—'),
+        d.elder_count + ' / ' + (d.family_count ? d.family_count : '<b style="color:var(--bad)">0（无人会收到通知）</b>'),
+        d.unacked || 0])));
+
+    table($('usr'), ['账号', '角色', '绑定设备', 'APP状态', '最后心跳', '版本', '手机型号', '注册时间'],
+      j.users.map((u) => tr([esc(u.username), u.role === 'elder' ? '老人端' : '家属端', esc(u.devices.join(', ')),
+        tag(u.app_status), esc(u.last_seen_text || '—'), esc(u.version || '—'), esc(u.model || '—'), esc(u.created_text)])));
+
+    table($('nts'), ['时间', '设备', '接收家属', '状态', '确认时间'],
+      j.notifications.map((n) => tr([esc(n.created_text), esc(n.device_id), esc(n.username || '—'), tag(n.status), esc(n.acked_text || '—')])));
+
+    table($('err'), ['时间', '账号', '类型', '页面', '版本', '手机型号', '信息'],
+      j.errors.map((e) => tr([esc(e.created_text), esc(e.username), esc(KIND[e.kind] || e.kind), esc(e.page), esc(e.version), esc(e.model),
+        '<span style="white-space:normal">' + esc(e.message) + '</span>'])));
+  } catch (e) { $('msg').textContent = '无法连接服务器'; }
+}
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>
